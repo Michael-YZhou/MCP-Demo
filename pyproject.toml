@@ -7,7 +7,12 @@ authors = [
     { name = "Yang Zhou", email = "yangzhouinter@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp>=1.6.0,<2",
+    "openai>=3.48.0",
+    "python-dotenv>=1.2.4",
+]
 
 [project.scripts]
 cmp-demo = "cmp_demo:main"

@@ -17,3 +17,8 @@ wheels/
 
 # IDE
 .idea/
+
+# Runtime outputs written by the MCP tools and client
+google_news/
+sentiment_reports/
+llm_outputs/
