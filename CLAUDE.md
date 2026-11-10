@@ -20,18 +20,20 @@ An MCP demo: a news-sentiment pipeline with a FastMCP stdio server and an LLM-dr
 
 ## Project status
 
-The code was imported from another project (`mcp-project`, originally run on Windows). Packaging and dependencies are now integrated. The client and server import and complete an MCP stdio handshake. Remaining work:
+The code was imported from another project (`mcp-project`, originally run on Windows). Packaging and dependencies are integrated. The client finds `server.py` next to itself (`SERVER_SCRIPT_PATH`) and launches it with `sys.executable`, so it works from any CWD. The MCP stdio handshake is verified, but no end-to-end run with real LLM, Serper, or SMTP calls has been done yet. Remaining work:
 
-- **Hardcoded server path.** `client.main()` launches `D:\mcp-project\server.py`, so the interactive client can't start until that path is fixed.
 - **No real entry point.** `cmp-demo` (`cmp_demo:main` in `__init__.py`) only prints a greeting. `main.py` is a leftover hello-world stub from the old project.
 - **`mcp` is pinned to `<2`.** The code uses the v1 API (`from mcp.server.fastmcp import FastMCP`). In mcp 2.x, FastMCP was renamed to `MCPServer` (`mcp.server.mcpserver`). Migrate the code before lifting the pin.
-- No tests, linter, or formatter are set up.
+- No linter or formatter is set up.
+- `client.py` and `server.py` use CRLF line endings, carried over from Windows. Keep them CRLF when editing, so diffs show only real changes, or normalize both files in a separate commit.
 
-## Known bugs in the code
+## Client behaviour worth knowing
 
-- `client.py` injects `attachment_path` for `send_email_with_attachment`, but that tool's parameter is `filename`, so the injection does nothing. The email step only works if the LLM supplies `filename` itself.
-- The tool definitions sent to the LLM use the key `input_schema`. The OpenAI function-tool format expects `parameters`, so the model never sees the argument schemas.
-- `plan_tool_usage` strips code fences with `r"```(?:json)?\\s*…\\s*```"`. In a raw string, `\\s` matches a literal backslash followed by `s`, so fenced JSON is never extracted, `json.loads` fails, and the plan comes back empty.
+- The client does not use native OpenAI tool calling. The LLM returns a JSON plan in plain text, and the client runs it. Tool results go back to the LLM in a `user` message, never a `role: "tool"` message: OpenAI-compatible APIs reject a `tool` message that has no matching assistant `tool_calls`.
+- The client fills in `filename` for both `analyze_sentiment` and `send_email_with_attachment` when the plan omits it, so the email attaches the report that the analysis just wrote.
+
+## Known issues in the code
+
 - The filename keyword regex captures too much. For example, "分析一下小米su7…" yields `一下小米su7近期`.
 - The tools use the synchronous `OpenAI` client inside `async` functions, which blocks the event loop.
 - `LLM_PROVIDER` (`dashscope | ollama`) is not read anywhere, and no Ollama backend exists.
@@ -43,10 +45,15 @@ Use `uv` for everything, and run it from the project root (not from `src/cmp_dem
 - `uv sync`: create `.venv` and install the package in editable mode
 - `uv add <pkg>` / `uv add --dev <pkg>`: add dependencies (this updates `pyproject.toml` and `uv.lock`)
 - `uv run cmp-demo`: the console entry point (currently prints a greeting only)
-- `uv run python src/cmp_demo/client.py`: the interactive client, after the hardcoded server path is fixed
+- `uv run python src/cmp_demo/client.py`: the interactive client. It starts the server itself
+- `uv run pytest`: run the tests. `uv run pytest tests/test_client.py::<test_name>` runs a single test
 - `uv build`: build the sdist and wheel into `dist/`
 
-Dependencies are `mcp` (`>=1.6.0,<2`), `openai`, `python-dotenv`, and `httpx`. They are locked in the root `uv.lock`; commit it.
+Dependencies are `mcp` (`>=1.6.0,<2`), `openai`, `python-dotenv`, and `httpx`, with `pytest` in the `dev` group. They are locked in the root `uv.lock`; commit it.
+
+## Tests
+
+`tests/test_client.py` tests `MCPClient` with fake objects in place of the OpenAI client (`client.chat.completions.create`) and the MCP `ClientSession` (`list_tools`, `call_tool`). The tests make no network calls and start no server. They `chdir` into a temp directory, so output files never land in the repo. Async methods are driven with `asyncio.run`, so `pytest-asyncio` isn't needed. `server.py` has no tests yet.
 
 ## Configuration
 
