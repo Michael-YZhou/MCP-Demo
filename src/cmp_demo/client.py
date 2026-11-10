@@ -5,11 +5,16 @@ from typing import Optional, List
 from contextlib import AsyncExitStack
 from datetime import datetime
 import re
+import sys
+from pathlib import Path
 from openai import OpenAI
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 load_dotenv()
+
+# server.py 与本文件位于同一目录
+SERVER_SCRIPT_PATH = str(Path(__file__).with_name("server.py"))
 
 
 class MCPClient:
@@ -31,8 +36,8 @@ class MCPClient:
         if not (is_python or is_js):
             raise ValueError("服务器脚本必须是 .py 或 .js 文件")
 
-        # 确定启动命令，.py 用 python，.js 用 node
-        command = "python" if is_python else "node"
+        # 确定启动命令，.py 用当前解释器（同一虚拟环境），.js 用 node
+        command = sys.executable if is_python else "node"
 
         # 构造 MCP 所需的服务器参数，包含启动命令、脚本路径参数、环境变量（为 None 表示默认）
         server_params = StdioServerParameters(command=command, args=[server_script_path], env=None)
@@ -65,7 +70,7 @@ class MCPClient:
                 "function": {
                     "name": tool.name,
                     "description": tool.description,
-                    "input_schema": tool.inputSchema
+                    "parameters": tool.inputSchema
                 }
             } for tool in response.tools
         ]
@@ -104,16 +109,23 @@ class MCPClient:
             # 注入统一的文件名或路径（用于分析和邮件）
             if tool_name == "analyze_sentiment" and "filename" not in tool_args:
                 tool_args["filename"] = md_filename
-            if tool_name == "send_email_with_attachment" and "attachment_path" not in tool_args:
-                tool_args["attachment_path"] = md_path
+            if tool_name == "send_email_with_attachment" and "filename" not in tool_args:
+                tool_args["filename"] = md_filename
 
             result = await self.session.call_tool(tool_name, tool_args)
 
             tool_outputs[tool_name] = result.content[0].text
+
+        # 将工具执行结果作为上下文交给大模型。
+        # 这里没有使用原生 tool_calls，所以不能发送 role 为 "tool" 的消息，
+        # 否则 OpenAI 兼容接口会因缺少对应的 tool_calls 而拒绝请求。
+        if tool_outputs:
+            results_text = "\n\n".join(
+                f"[{name}]\n{output}" for name, output in tool_outputs.items()
+            )
             messages.append({
-                "role": "tool",
-                "tool_call_id": tool_name,
-                "content": result.content[0].text
+                "role": "user",
+                "content": f"以下是工具的执行结果，请据此回答上面的请求：\n\n{results_text}"
             })
 
         # 调用大模型生成回复信息，并输出保存结果
@@ -203,7 +215,7 @@ class MCPClient:
 
         # 提取出模型返回的 JSON 内容
         content = response.choices[0].message.content.strip()
-        match = re.search(r"```(?:json)?\\s*([\s\S]+?)\\s*```", content)
+        match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", content)
         if match:
             json_text = match.group(1)
         else:
@@ -222,7 +234,7 @@ class MCPClient:
 
 
 async def main():
-    server_script_path = "D:\\mcp-project\\server.py"
+    server_script_path = SERVER_SCRIPT_PATH
     client = MCPClient()
     try:
         await client.connect_to_server(server_script_path)
