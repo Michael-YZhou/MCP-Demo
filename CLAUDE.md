@@ -35,7 +35,7 @@ The code was imported from another project (`mcp-project`, originally run on Win
 - The report filename comes from a keyword regex in `process_query`. It takes the text after a verb (关于/分析/查询/搜索/查看), skips the filler words 一下, 关于, and 最近/近期 right after the verb, and stops at 的, whitespace, or punctuation. A trailing time word stays: "分析一下小米su7近期的…" yields `小米su7近期`.
 
 ## Known issues in the code
-- The tools use the synchronous `OpenAI` client inside `async` functions, which blocks the event loop.
+- The tools use the synchronous `OpenAI` client inside `async` functions, which blocks the event loop. `send_email_with_attachment` blocks the same way with `smtplib`. The planned fix is in the README under "Future improvements"; keep that section up to date.
 - `LLM_PROVIDER` (`dashscope | ollama`) is not read anywhere, and no Ollama backend exists.
 
 ## Commands
