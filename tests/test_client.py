@@ -145,3 +145,23 @@ def test_default_server_path_is_server_py_next_to_client():
 
     assert path == Path(client_module.__file__).with_name("server.py")
     assert path.is_file()
+
+
+@pytest.mark.parametrize(
+    ("query", "keyword"),
+    [
+        ("分析一下小米su7近期的热点新闻，并发送邮件", "小米su7近期"),
+        ("分析关于小米su7的新闻", "小米su7"),
+        ("查看一下最近小米的新闻", "小米"),
+        ("搜索小米su7", "小米su7"),
+        ("你好", "分析对象"),
+    ],
+)
+def test_report_filename_uses_subject_keyword_without_filler_words(make_client, query, keyword):
+    plan = [{"name": "analyze_sentiment", "arguments": {"text": "news"}}]
+    c = make_client([json.dumps(plan), "final answer"])
+
+    asyncio.run(c.process_query(query))
+
+    filename = dict(c.session.tool_calls)["analyze_sentiment"]["filename"]
+    assert filename.startswith(f"sentiment_{keyword}_")

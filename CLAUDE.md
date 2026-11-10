@@ -32,9 +32,9 @@ The code was imported from another project (`mcp-project`, originally run on Win
 - The client does not use native OpenAI tool calling. The LLM returns a JSON plan in plain text, and the client runs it. Tool results go back to the LLM in a `user` message, never a `role: "tool"` message: OpenAI-compatible APIs reject a `tool` message that has no matching assistant `tool_calls`.
 - The client fills in `filename` for both `analyze_sentiment` and `send_email_with_attachment` when the plan omits it, so the email attaches the report that the analysis just wrote.
 
-## Known issues in the code
+- The report filename comes from a keyword regex in `process_query`. It takes the text after a verb (关于/分析/查询/搜索/查看), skips the filler words 一下, 关于, and 最近/近期 right after the verb, and stops at 的, whitespace, or punctuation. A trailing time word stays: "分析一下小米su7近期的…" yields `小米su7近期`.
 
-- The filename keyword regex captures too much. For example, "分析一下小米su7…" yields `一下小米su7近期`.
+## Known issues in the code
 - The tools use the synchronous `OpenAI` client inside `async` functions, which blocks the event loop.
 - `LLM_PROVIDER` (`dashscope | ollama`) is not read anywhere, and no Ollama backend exists.
 

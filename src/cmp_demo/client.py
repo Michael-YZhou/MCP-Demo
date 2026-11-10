@@ -78,7 +78,8 @@ class MCPClient:
         # 提取问题的关键词，对文件名进行生成。
         # 在接收到用户提问后就应该生成出最后输出的 md 文档的文件名，
         # 因为导出时若再生成文件名会导致部分组件无法识别该名称。
-        keyword_match = re.search(r'(关于|分析|查询|搜索|查看)([^的\s，。、？\n]+)', query)
+        # 动词后可能跟着“一下”“关于”“最近/近期”等虚词，跳过它们，只保留真正的主题词
+        keyword_match = re.search(r'(关于|分析|查询|搜索|查看)(?:一下)?(?:关于)?(?:最近|近期)?([^的\s，。、？\n]+)', query)
         keyword = keyword_match.group(2) if keyword_match else "分析对象"
         safe_keyword = re.sub(r'[\\/:*?"<>|]', '', keyword)[:20]
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
